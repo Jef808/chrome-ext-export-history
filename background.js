@@ -1,4 +1,7 @@
-const settings = {};
+const settings = {
+  isActive: false,
+  publishUrl: ""
+};
 
 chrome.runtime.onStartup.addListener(initialize);
 chrome.runtime.onInstalled.addListener(initialize);
@@ -21,8 +24,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 // Initialize the settings object with saved values and start listening for navigation events when active
 async function initialize() {
   const data = await chrome.storage.sync.get('settings');
-  const settings = data.settings;
-  Object.assign(settings, data.settings);
+  const storedSettings = data.settings || {};
+
+  settings.isActive = Boolean(storedSettings.isActive);
+  settings.publishUrl = storedSettings.publishUrl || "";
+
   console.log(`Extension initialized: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
 
   if (settings.isActive) {
