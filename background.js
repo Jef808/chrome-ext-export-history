@@ -18,7 +18,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   }
 });
 
-// Initialize the settings object with saved values
+// Initialize the settings object with saved values and start listening for navigation events when active
 async function initialize() {
   const data = await chrome.storage.sync.get('settings');
   const settings = data.settings;
@@ -32,10 +32,12 @@ async function initialize() {
 
 function startListening() {
   chrome.webNavigation.onCompleted.addListener(handleNavigationCompleted);
+  chrome.tabs.onActivated.addListener(handleTabActivated);
 }
 
 function stopListening() {
   chrome.webNavigation.onCompleted.removeListener(handleNavigationCompleted);
+  chrome.tabs.onActivated.removeListener(handleTabActivated);
 }
 
 async function handleNavigationCompleted(details) {
@@ -43,31 +45,73 @@ async function handleNavigationCompleted(details) {
     return;  // Only handle main frame navigations
   }
 
+  const url = details.url;
+  if (!url || url.startsWith('chrome://')) {
+    return;  // Ignore internal Chrome URLs
+  }
+
   await publishEvent({
     type: 'navigation_completed',
-    url: details.url,
+    url: url,
     tabId: details.tabId,
     timestamp: Date.now(),
-    frameId: details.frameId
   });
 }
+
+async function handleTabActivated(activeInfo) {
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+
+    const url = tab.url;
+    if (!url || !url.startsWith('http')) {
+      return;  // Ignore non-HTTP URLs
+    }
+
+    await publishEvent({
+      type: 'tab_activated',
+      url,
+      tabId: activeInfo.tabId,
+      timestamp: Date.now(),
+    })
+  } catch (error) {
+    console.error('Failed to handle tab activation:', error);
+  }
+}
+
 
 async function publishEvent(eventData) {
   if (!settings.publishUrl || !settings.isActive) {
     return;
   }
+
   try {
+    const userEmail = await getUserEmail();
+    const enrichedEventData = {
+      ...eventData,
+      user: userEmail
+    };
+
     const response = await fetch(settings.publishUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(eventData)
+      body: JSON.stringify(enrichedEventData)
     });
+
     if (!response.ok) {
       throw new Error(`Failed to publish event: ${response.statusText}`);
     }
   } catch (error) {
     console.error('Failed to publish navigation event:', error);
+  }
+}
+
+async function getUserEmail() {
+  try {
+    const userInfo = await chrome.identity.getProfileUserInfo();
+    return userInfo.email;
+  } catch (error) {
+    console.error('Failed to get user email:', error);
   }
 }
