@@ -1,101 +1,73 @@
-let isActive = false;
-let publishUrl = '';
+const settings = {};
 
 chrome.runtime.onStartup.addListener(initialize);
 chrome.runtime.onInstalled.addListener(initialize);
 
-async function initialize() {
-  const result = await chrome.storage.sync.get(['isActive', 'publishUrl']);
-  isActive = result.isActive || false;
-  publishUrl = result.publishUrl || '';
-
-  if (isActive) {
-    startListening();
-  }
-}
-
+// Listen for changes in the settings from the popup
 chrome.storage.onChanged.addListener((changes, namespace) => {
-  if (namespace === 'sync') {
-    if (changes.isActive) {
-      isActive = changes.isActive.newValue;
-      if (isActive) {
-        startListening();
-      } else {
-        stopListening();
-      }
-    }
-    if (changes.publishUrl) {
-      publishUrl = changes.publishUrl.newValue;
+  if (namespace === 'sync' && changes.settings?.newValue) {
+    settings.isActive = Boolean(changes.settings.newValue.isActive);
+    settings.publishUrl = changes.settings.newValue.publishUrl || "";
+    console.log(`Settings changed: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
+
+    if (settings.isActive) {
+      startListening();
+    } else {
+      stopListening();
     }
   }
 });
 
+// Initialize the settings object with saved values
+async function initialize() {
+  const data = await chrome.storage.sync.get('settings');
+  const settings = data.settings;
+  Object.assign(settings, data.settings);
+  console.log(`Extension initialized: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
+
+  if (settings.isActive) {
+    startListening();
+  }
+}
+
 function startListening() {
-  chrome.webNavigation.onBeforeNavigate.addListener(handleNavigation);
   chrome.webNavigation.onCompleted.addListener(handleNavigationCompleted);
-  chrome.webNavigation.onErrorOccurred.addListener(handleNavigationError);
 }
 
 function stopListening() {
-  chrome.webNavigation.onBeforeNavigate.removeListener(handleNavigation);
   chrome.webNavigation.onCompleted.removeListener(handleNavigationCompleted);
-  chrome.webNavigation.onErrorOccurred.removeListener(handleNavigationError);
-}
-
-async function handleNavigation(details) {
-  if (details.frameId === 0) {
-    await publishEvent({
-      type: 'navigation_start',
-      url: details.url,
-      tabId: details.tabId,
-      timestamp: Date.now(),
-      frameId: details.frameId
-    });
-  }
 }
 
 async function handleNavigationCompleted(details) {
-  if (details.frameId === 0) {
-    await publishEvent({
-      type: 'navigation_completed',
-      url: details.url,
-      tabId: details.tabId,
-      timestamp: Date.now(),
-      frameId: details.frameId
-    })
+  if (details.frameId !== 0) {
+    return;  // Only handle main frame navigations
   }
-}
 
-async function handleNavigationError(details) {
-  if (details.frameId === 0) {
-    await publishEvent({
-      type: 'navigation_error',
-      url: details.url,
-      tabId: details.tabId,
-      timestamp: Date.now(),
-      error: details.error,
-      frameId: details.frameId,
-    });
-  }
+  await publishEvent({
+    type: 'navigation_completed',
+    url: details.url,
+    tabId: details.tabId,
+    timestamp: Date.now(),
+    frameId: details.frameId
+  });
 }
 
 async function publishEvent(eventData) {
-  if (!publishUrl || !isActive) {
+  if (!settings.publishUrl || !settings.isActive) {
     return;
   }
-
   try {
-    await fetch(publishUrl, {
+    const response = await fetch(settings.publishUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(eventData),
+      body: JSON.stringify(eventData)
     });
+    if (!response.ok) {
+      throw new Error(`Failed to publish event: ${response.statusText}`);
+    }
   } catch (error) {
     console.error('Failed to publish navigation event:', error);
   }
 }
-
-// initialize on script load
-initialize();

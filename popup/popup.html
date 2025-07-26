@@ -4,24 +4,25 @@
         <link rel="stylesheet" href="popup.css">
     </head>
     <body>
+        <script defer src="popup.js" type="module"></script>
+
         <div class="header">History Publisher</div>
 
-        <div class="section">
-            <label for="publishUrl">Publish URL:</label>
-            <input type="url" id="publishUrl" placeholder="https://your-endpoint.com/events">
-        </div>
-
-        <div class="section">
-            <div class="toggle-container">
-                <label class="toggle">
-                    <input type="checkbox" id="isActive">
-                    <span class="slider"></span>
-                </label>
-                <span>Active</span>
+        <form id="settingsForm">
+            <div class="section">
+                <label for="publishUrl">Publish URL:</label>
+                <input type="url" name="publishUrl" id="publishUrl">
             </div>
-            <div class="status" id="status">Inactive</div>
-        </div>
 
-        <script src="popup.js"></script>
+            <div class="section">
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" name="isActive" id="isActive">
+                        <span class="slider"></span>
+                    </label>
+                    <span>Active</span>
+                </div>
+            </div>
+        </form>
     </body>
 </html>
