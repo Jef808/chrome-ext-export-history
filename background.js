@@ -138,3 +138,8 @@ async function getUserEmail() {
     console.error('Failed to get user email:', error);
   }
 }
+
+// Initialize on script load
+// This will also be called when the service worker reactivates
+// after idle periods
+initialize();
