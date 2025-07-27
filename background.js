@@ -84,9 +84,26 @@ async function handleTabActivated(activeInfo) {
   }
 }
 
+async function getSettings() {
+  if (!settings.publishUrl) {
+    const data = await chrome.storage.sync.get('settings');
+    const storedSettings = data.settings || {};
+
+    settings.isActive = Boolean(storedSettings.isActive);
+    settings.publishUrl = storedSettings.publishUrl || "";
+
+    console.log(`Refreshed settings: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
+  }
+
+  return settings;
+}
+
+
 
 async function publishEvent(eventData) {
-  if (!settings.publishUrl || !settings.isActive) {
+  const {isActive, publishUrl} = await getSettings();
+
+  if (!publishUrl || !isActive) {
     return;
   }
 
@@ -97,7 +114,7 @@ async function publishEvent(eventData) {
       user: userEmail
     };
 
-    const response = await fetch(settings.publishUrl, {
+    const response = await fetch(publishUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
