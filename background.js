@@ -4,9 +4,6 @@ const settings = {
 };
 
 
-// chrome.runtime.onStartup.addListener(initialize);
-// chrome.runtime.onInstalled.addListener(initialize);
-
 chrome.webNavigation.onCompleted.addListener(handleNavigationCompleted);
 chrome.tabs.onActivated.addListener(handleTabActivated);
 
@@ -30,12 +27,19 @@ async function handleNavigationCompleted(details) {
     return;  // Ignore internal Chrome URLs
   }
 
-  await publishEvent({
-    type: 'navigation_completed',
-    url: url,
-    tabId: details.tabId,
-    timestamp: Date.now(),
-  });
+  try {
+    const tab = await chrome.tabs.get(details.tabId);
+
+    await publishEvent({
+      type: 'navigation_completed',
+      url: url,
+      title: tab.title,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Failed to handle navigation completed:', error);
+  }
+
 }
 
 async function handleTabActivated(activeInfo) {
@@ -50,7 +54,7 @@ async function handleTabActivated(activeInfo) {
     await publishEvent({
       type: 'tab_activated',
       url,
-      tabId: activeInfo.tabId,
+      title: tab.title,
       timestamp: Date.now(),
     })
   } catch (error) {
