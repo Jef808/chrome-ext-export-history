@@ -3,48 +3,22 @@ const settings = {
   publishUrl: ""
 };
 
-chrome.runtime.onStartup.addListener(initialize);
-chrome.runtime.onInstalled.addListener(initialize);
+
+// chrome.runtime.onStartup.addListener(initialize);
+// chrome.runtime.onInstalled.addListener(initialize);
+
+chrome.webNavigation.onCompleted.addListener(handleNavigationCompleted);
+chrome.tabs.onActivated.addListener(handleTabActivated);
 
 // Listen for changes in the settings from the popup
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'sync' && changes.settings?.newValue) {
     settings.isActive = Boolean(changes.settings.newValue.isActive);
     settings.publishUrl = changes.settings.newValue.publishUrl || "";
-    console.log(`Settings changed: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
 
-    if (settings.isActive) {
-      startListening();
-    } else {
-      stopListening();
-    }
+    console.log(`Settings changed: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
   }
 });
-
-// Initialize the settings object with saved values and start listening for navigation events when active
-async function initialize() {
-  const data = await chrome.storage.sync.get('settings');
-  const storedSettings = data.settings || {};
-
-  settings.isActive = Boolean(storedSettings.isActive);
-  settings.publishUrl = storedSettings.publishUrl || "";
-
-  console.log(`Extension initialized: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
-
-  if (settings.isActive) {
-    startListening();
-  }
-}
-
-function startListening() {
-  chrome.webNavigation.onCompleted.addListener(handleNavigationCompleted);
-  chrome.tabs.onActivated.addListener(handleTabActivated);
-}
-
-function stopListening() {
-  chrome.webNavigation.onCompleted.removeListener(handleNavigationCompleted);
-  chrome.tabs.onActivated.removeListener(handleTabActivated);
-}
 
 async function handleNavigationCompleted(details) {
   if (details.frameId !== 0) {
@@ -84,22 +58,6 @@ async function handleTabActivated(activeInfo) {
   }
 }
 
-async function getSettings() {
-  if (!settings.publishUrl) {
-    const data = await chrome.storage.sync.get('settings');
-    const storedSettings = data.settings || {};
-
-    settings.isActive = Boolean(storedSettings.isActive);
-    settings.publishUrl = storedSettings.publishUrl || "";
-
-    console.log(`Refreshed settings: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
-  }
-
-  return settings;
-}
-
-
-
 async function publishEvent(eventData) {
   const {isActive, publishUrl} = await getSettings();
 
@@ -130,6 +88,20 @@ async function publishEvent(eventData) {
   }
 }
 
+async function getSettings() {
+  if (!settings.publishUrl) {
+    const data = await chrome.storage.sync.get('settings');
+    const storedSettings = data.settings || {};
+
+    settings.isActive = Boolean(storedSettings.isActive);
+    settings.publishUrl = storedSettings.publishUrl || "";
+
+    console.log(`Refreshed settings: isActive=${settings.isActive}, publishUrl=${settings.publishUrl}`);
+  }
+
+  return settings;
+}
+
 async function getUserEmail() {
   try {
     const userInfo = await chrome.identity.getProfileUserInfo();
@@ -138,8 +110,3 @@ async function getUserEmail() {
     console.error('Failed to get user email:', error);
   }
 }
-
-// Initialize on script load
-// This will also be called when the service worker reactivates
-// after idle periods
-initialize();
